@@ -1,12 +1,10 @@
 import numpy as np
 
 import torch
-from torch.nn import Linear, Parameter, Sequential as Seq, Linear, ReLU
-import torch.nn.functional as F
+from torch.nn import Sequential as Seq, Linear, ReLU
 
-from torch_geometric.nn import MessagePassing, GCNConv, global_add_pool, GraphConv
+from torch_geometric.nn import MessagePassing
 from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader
 from torch_geometric.utils import add_self_loops, degree
 
 
@@ -30,8 +28,9 @@ edge_index = torch.tensor([[0, 1],
                            ], dtype=torch.long)
 y = torch.tensor([[0], [0], [0], [1], [1]], dtype=torch.float)
 data = Data(x = x, edge_index = edge_index.t().contiguous(), y = y)
-data.edge_index, data.edge_index.shape
-data.x, data.x.shape
+
+data.x
+data.edge_index
 data.y
 
 
@@ -66,10 +65,7 @@ x[data.edge_index[1]]
 #################################################################################################################
 #################################################################################################################
 
-
 class IAmMyOthers(MessagePassing):
-    def __init__(self):
-        super().__init__(aggr = "sum") # or use mean, max, min
     def forward(self, x, edge_index):
         print("in forward")
         out = self.propagate(edge_index, x = x)
@@ -91,8 +87,6 @@ out
 ######################################
 
 class IAmMyOthersAndMyselfAsWell(MessagePassing):
-    def __init__(self):
-        super().__init__(aggr = "sum")
     def forward(self, x, edge_index):
         edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
         print("in forward, augmented edge index is")
@@ -114,16 +108,10 @@ out
 from torch_scatter import scatter
 
 class IAmJustTheOppositeReally(MessagePassing):
-    def __init__(self):
-        super().__init__() 
     def forward(self, x, edge_index):
-        print("in forward")
         out = self.propagate(edge_index, x = x)
         return out
     def message(self, x_j):
-        print("in message, x_j is")
-        print(x_j)
-        return x_j
     def aggregate(self, inputs, index):
         print("in aggregate, inputs is")
         # same as x_j (incoming node features)
@@ -160,19 +148,10 @@ out
 ######################################
 
 class IDoEvolveOverTime(MessagePassing):
-    def __init__(self):
-        super().__init__(aggr = "sum")
     def forward(self, x, edge_index):
         edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
         out = self.propagate(edge_index, x = x)
         return out
-    def message(self, x_j):
-        print("in message")
-        return x_j
-    def aggregate(self, inputs, index):
-        print("in aggregate")
-        # same as x_j (incoming node features)
-        return(scatter(inputs, index, dim = 0, reduce = "add")) # default is -1
     def update(self, inputs, x):
         print("in update, inputs is")
         print(inputs)
@@ -199,8 +178,6 @@ class ILearnAndEvolve(MessagePassing):
         x = self.mlp(x)
         out = self.propagate(edge_index = edge_index, x = x)
         return out
-    def message(self, x_j):
-        return x_j
     def update(self, inputs, x):
         return (inputs + x)/2
 
