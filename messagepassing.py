@@ -2,6 +2,7 @@ import numpy as np
 
 import torch
 from torch.nn import Sequential as Seq, Linear, ReLU
+import torch.nn.functional as F
 
 from torch_geometric.nn import MessagePassing
 from torch_geometric.data import Data
@@ -195,7 +196,7 @@ class ILearnAndEvolveDoubly(MessagePassing):
         self.mlp1 = Seq(Linear(in_channels, out_channels),
                        ReLU(),
                        Linear(out_channels, out_channels))
-        self.mlp2 = Seq(Linear(2 * out_channels, out_channels),
+        self.mlp2 = Seq(Linear(out_channels, out_channels),
                        ReLU(),
                        Linear(out_channels, out_channels))
     def forward(self, x, edge_index):
@@ -203,11 +204,8 @@ class ILearnAndEvolveDoubly(MessagePassing):
         x = self.mlp1(x)
         out = self.propagate(edge_index = edge_index, x = x)
         return out
-    def message(self, x_j, x_i):
-        new_embeddings = torch.cat([x_i, x_j - x_i], dim = 1)  # tmp has shape [E, 2 * in_channels]
-        return self.mlp2(new_embeddings)
     def update(self, inputs, x):
-        return (inputs + x)/2
+        return self.mlp2((inputs + x)/2)
 
 module = ILearnAndEvolveDoubly(2, 2)
 out = module(data.x, data.edge_index)
@@ -225,15 +223,12 @@ class Network(torch.nn.Module):
         super().__init__()
         self.conv = ILearnAndEvolveDoubly(in_channels, out_channels)
         self.classifier = Linear(out_channels, num_classes)
-
     def forward(self, x, edge_index):
         x, edge_index = data.x, data.edge_index
         x = self.conv(x, edge_index)
         return self.classifier(x)
 
 model = Network(2, 2, 1)
-model(data.x, data.edge_index)  
-      
 
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.01)
 model.train()
@@ -244,6 +239,5 @@ for epoch in range(5):
     print(loss.detach().numpy())
     loss.backward()
     optimizer.step()
-    
 preds = torch.sigmoid(out)
 preds
